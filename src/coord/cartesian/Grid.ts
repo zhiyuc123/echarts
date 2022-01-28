@@ -23,7 +23,7 @@
  * TODO Default cartesian
  */
 
-import {isObject, each, indexOf, retrieve3, map, keys} from 'zrender/src/core/util';
+import {isObject, each, indexOf, retrieve3, keys} from 'zrender/src/core/util';
 import {getLayoutRect, LayoutRect} from '../../util/layout';
 import {
     createScaleByModel,
@@ -170,7 +170,7 @@ class Grid implements CoordinateSystemMaster {
     resize(gridModel: GridModel, api: ExtensionAPI, ignoreContainLabel?: boolean): void {
 
         const boxLayoutParams = gridModel.getBoxLayoutParams();
-        const isContainLabel = !ignoreContainLabel && gridModel.get('containLabel');
+        const isContainLabel = this._getContainLabel(gridModel, ignoreContainLabel)
 
         const gridRect = getLayoutRect(
             boxLayoutParams, {
@@ -182,29 +182,25 @@ class Grid implements CoordinateSystemMaster {
 
         const axesList = this._axesList;
 
-        adjustAxes();
-
         // Minus label size
-        if (isContainLabel) {
-            each(axesList, function (axis) {
-                if (!axis.model.get(['axisLabel', 'inside'])) {
-                    const labelUnionRect = estimateLabelUnionRect(axis);
-                    if (labelUnionRect) {
-                        const dim: 'height' | 'width' = axis.isHorizontal() ? 'height' : 'width';
-                        const margin = axis.model.get(['axisLabel', 'margin']);
-                        gridRect[dim] -= labelUnionRect[dim] + margin;
-                        if (axis.position === 'top') {
-                            gridRect.y += labelUnionRect.height + margin;
-                        }
-                        else if (axis.position === 'left') {
-                            gridRect.x += labelUnionRect.width + margin;
-                        }
+        each(axesList, function (axis) {
+            if (!axis.model.get(['axisLabel', 'inside'])) {
+                const labelUnionRect = estimateLabelUnionRect(axis);
+                if (labelUnionRect && isContainLabel[axis.position] ) {
+                    const dim: 'height' | 'width' = axis.isHorizontal() ? 'height' : 'width';
+                    const margin = axis.model.get(['axisLabel', 'margin']);
+                    gridRect[dim] -= labelUnionRect[dim] + margin;
+                    if (axis.position === 'top') {
+                        gridRect.y += labelUnionRect.height + margin;
+                    }
+                    else if (axis.position === 'left') {
+                        gridRect.x += labelUnionRect.width + margin;
                     }
                 }
-            });
+            }
+        });
 
-            adjustAxes();
-        }
+        adjustAxes();
 
         each(this._coordsList, function (coord) {
             // Calculate affine matrix to accelerate the data to point transform.
@@ -334,6 +330,22 @@ class Grid implements CoordinateSystemMaster {
         }
 
         return {cartesian: cartesian, axis: axis};
+    }
+
+    private _getContainLabel(gridModel: GridModel, ignoreContainLabel: boolean = false): {
+        top: boolean,
+        right: boolean,
+        bottom: boolean,
+        left: boolean
+    } {
+        const containLabel = !ignoreContainLabel && gridModel.get('containLabel');
+        const isConfigurationByObject = typeof containLabel === 'object';
+        return {
+            top: isConfigurationByObject ? containLabel.top || false : containLabel,
+            right: isConfigurationByObject ? containLabel.right || false : containLabel,
+            bottom: isConfigurationByObject ? containLabel.bottom || false : containLabel,
+            left: isConfigurationByObject ? containLabel.left || false : containLabel
+        }
     }
 
     /**
